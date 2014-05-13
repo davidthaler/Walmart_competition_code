@@ -19,12 +19,14 @@ The code assumes a directory structure under the project level of:
 You can regenerate the winning entry with source('runAll.R') from inside R. Without the fourier.arima model, the code runs in 30-40 minutes and gets about 2320 on the final leader board. With that model included, it generates the winning score of around 2300, but takes an extra 2 hours or so.  
 
 To run the best performing single model from scratch:  
-    source('util.R')
-    source('grouped.forecast')
-    source('util')
-    train <- raw.train()
-    test <- raw.test()
-    pred <- grouped.forecast(train, test, 'stlf.svd', model.type='ets', n.comp=12)
-    pred <- postprocess(train, test, shift=2.5)
-    write.submission(pred)
+
+   source('util.R')
+   source('grouped.forecast')
+   source('util')
+   train <- raw.train()
+   test <- raw.test()
+   pred <- grouped.forecast(train, test, 'stlf.svd', model.type='ets', n.comp=12)
+   pred <- postprocess(train, test, shift=2.5)
+   write.submission(pred)  
+
 If you are in the competition (or have accepted the rules), you should be able to submit that for 2348 on the final leaderboard by going to: [submit](http://www.kaggle.com/c/walmart-recruiting-store-sales-forecasting/submissions/attach) and uploading the .csv file.

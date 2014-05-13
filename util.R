@@ -1,9 +1,8 @@
 require(plyr)
 
-paths = list(data='~/Documents/Kaggle/Walmart/data/',
-             submit='~/Documents/Kaggle/Walmart/submissions/',
-             r='~/Documents/Kaggle/Walmart/R/',
-             valid='~/Documents/Kaggle/Walmart/validation/')
+paths = list(data='~/Documents/Kaggle/Kaggle_Walmart/data/',
+             submit='~/Documents/Kaggle/Kaggle_Walmart/submissions/',
+             r='~/Documents/Kaggle/Kaggle_Walmart/R/')
 
 sample.submission <- function(){
   ss <- read.csv(paste0(paths$data, 'sampleSubmission.csv'))

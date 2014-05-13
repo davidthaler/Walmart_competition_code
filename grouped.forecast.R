@@ -82,14 +82,6 @@ product <- function(train, test){
   test
 }
 
-preprocess.svd <- function(train, n.comp){
-  train[is.na(train)] <- 0
-  z <- svd(train[, 2:ncol(train)], nu=n.comp, nv=n.comp)
-  s <- diag(z$d[1:n.comp])
-  train[, 2:ncol(train)] <- z$u %*% s %*% t(z$v)
-  train
-}
-
 stlf.svd <- function(train, test, model.type, n.comp){
   horizon <- nrow(test)
   train <- preprocess.svd(train, n.comp) 
@@ -171,11 +163,10 @@ stlf.nn <- function(train, test, method='ets', k, level1, level2){
 
 fourier.arima <- function(train, test, n.comp, k){
   horizon <- nrow(test)
-  tr <- preprocess.svd(train, n.comp)
   for(j in 2:ncol(tr)){
     #train still has its NA's
     if(sum(is.na(train[, j])) > nrow(train)/3){
-      test[, j] <- fallback.linear(tr[,j], horizon, 12)
+      test[, j] <- fallback(tr[,j], horizon)
       print(paste('Fallback to linear model on store:', names(train)[j]))
     }else{
       # fit arima model
@@ -208,15 +199,6 @@ seasonal.arima.svd <- function(train, test, n.comp){
   test
 }
 
-fallback <- function(train, horizon){
-  #NB: train should be a column
-  s <- ts(train, frequency=52)
-  s[is.na(s)] <- 0
-  fc <- ses(diff(s, 52), h=horizon)
-  result <- diffinv(fc$mean, lag=52, xi=s[length(s) - 51:0])
-  result[length(result) - horizon:1 + 1]
-}
-
 tslm <- function(train, test){
   horizon <- nrow(test)
   for(j in 2:ncol(train)){
@@ -226,4 +208,21 @@ tslm <- function(train, test){
     test[, j] <- as.numeric(fc$mean)
   }
   test
+}
+
+fallback <- function(train, horizon){
+  #NB: train should be a column
+  s <- ts(train, frequency=52)
+  s[is.na(s)] <- 0
+  fc <- ses(diff(s, 52), h=horizon)
+  result <- diffinv(fc$mean, lag=52, xi=s[length(s) - 51:0])
+  result[length(result) - horizon:1 + 1]
+}
+
+preprocess.svd <- function(train, n.comp){
+  train[is.na(train)] <- 0
+  z <- svd(train[, 2:ncol(train)], nu=n.comp, nv=n.comp)
+  s <- diag(z$d[1:n.comp])
+  train[, 2:ncol(train)] <- z$u %*% s %*% t(z$v)
+  train
 }

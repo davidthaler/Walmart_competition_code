@@ -2,8 +2,8 @@ source('util.R')
 source('grouped.forecast.R')
 source('postprocess.R')
 
-#train <- raw.train()
-#test <- raw.test()
+train <- raw.train()
+test <- raw.test()
 
 # Make the 3 simple models, shift their values and average them.
 # The shifted average gets 2503 on the final board.
@@ -22,6 +22,18 @@ pred <- make.average(simple.nums)
 print('This is the shifted average of simple models.')
 # keep the number, because this goes into the final model
 sub.nums <- write.submission(pred) 
+
+# This is model 5 from the post, regression on Fourier series terms with 
+# non-seasonal arima errors. This model scores poorly on its own, but 
+# improves the average anyway. This model is shifted by 1 because its
+# period is 365/7, not 52. It is also very smooth, so the shift actually
+# makes no difference here anyway.
+#
+# NB: This model may take a couple of hours to run
+pred <- grouped.forecast(train, test, 'fourier.arima', k=12)
+pred <- postprocess(train, pred, shift=1)
+s.num <- write.submission(pred)
+sub.nums <- c(sub.nums, s.num)
 
 # This is model 1 from the post. It gets 2348 on the final board.
 pred <- grouped.forecast(train, test, 'stlf.svd', model.type='ets', n.comp=12)
@@ -49,18 +61,6 @@ pred <- grouped.forecast(train, test, 'seasonal.arima.svd', n.comp=15)
 pred <- postprocess(train, pred, shift=2)
 s.num <- write.submission(pred)
 sub.nums <- c(sub.nums, s.num)
-
-# This is model 5 from the post, regression on Fourier series terms with 
-# non-seasonal arima errors. This model scores poorly on its own, but 
-# improves the average anyway. This model is shifted by 1 because its
-# period is 365/7, not 52. It is also very smooth, so the shift actually
-# makes no difference here anyway.
-#
-# NB: This model may take a couple of hours to run
-# pred <- grouped.forecast(train, test, 'fourier.arima', k=12)
-# pred <- postprocess(train, pred, shift=1)
-# s.num <- write.submission(pred)
-# sub.nums <- c(sub.nums, s.num)
 
 # This is the final result.
 pred <- make.average(sub.nums)

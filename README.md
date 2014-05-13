@@ -2,7 +2,7 @@
 This repository hosts R code for the winning entry in Kaggle's [Walmart sales forecasting competition](http://www.kaggle.com/c/walmart-recruiting-store-sales-forecasting). 
 
 ##Description  
-There is a [Kaggle forum post](http://www.kaggle.com/c/walmart-recruiting-store-sales-forecasting/forums/t/8023/thank-you-and-2-rank-model?page=2) explaining the winning entry. Briefly, it is an unweighted average of 6 component models, all of them weekly time-series models, followed by a transformation around Christmas to reflect that the day of the week that Christmas lands on shifts from year to year. That shift is explained [here](http://www.kaggle.com/c/walmart-recruiting-store-sales-forecasting/forums/t/8028/a-key-adjustment).
+There is a [Kaggle forum post](http://www.kaggle.com/c/walmart-recruiting-store-sales-forecasting/forums/t/8125/first-place-entry) explaining the winning entry. Briefly, it is an unweighted average of 6 component models, all of them weekly time-series models, followed by a transformation around Christmas to reflect that the day of the week that Christmas lands on shifts from year to year. That shift is explained [here](http://www.kaggle.com/c/walmart-recruiting-store-sales-forecasting/forums/t/8028/a-key-adjustment).
 
 ##Requirements
 * [R](http://www.r-project.org/)

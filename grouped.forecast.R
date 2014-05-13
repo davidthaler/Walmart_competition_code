@@ -3,7 +3,17 @@ require(forecast)
 require(reshape)
 
 grouped.forecast <- function(train, test, fname, ...){
-  
+  # Iterates over the departments and calls a model function to make forecasts
+  # on each of them.
+  #
+  # args:
+  #  train - a data frame containing the data from train.csv, or part of it.
+  #  test - a data frame like that returned by raw.test()
+  #  fname - a string specifying which model function to call
+  #
+  # returns:
+  #  a data frame corresponding to the test parameter, but with all of the 
+  #  predictions in the Weekly_Sales field
   FNAMES <- c('seasonal.naive',
               'product',
               'stlf.svd',
@@ -62,6 +72,17 @@ grouped.forecast <- function(train, test, fname, ...){
 }
 
 seasonal.naive <- function(train, test){
+  # Computes seasonal naive forecasts
+  #
+  # args:
+  # train - A matrix of Weekly_Sales values from the training set of dimension
+  #         (number of weeeks in training data) x (number of stores)
+  # test - An all-zeros matrix of dimension:
+  #       (number of weeeks in training data) x (number of stores)
+  #       The forecasts are written in place of the zeros.
+  #
+  # returns:
+  #  the test(forecast) data frame with the forecasts filled in 
   h <- nrow(test)
   tr <- train[nrow(train) - (52:1) + 1,]
   tr[is.na(tr)] <- 0
@@ -70,6 +91,19 @@ seasonal.naive <- function(train, test){
 }
 
 product <- function(train, test){
+  # Computes forecasts with the product model. This model predicts the mean
+  # value by store times the mean value by week divided by the mean value
+  # over the department.
+  #
+  # args:
+  # train - A matrix of Weekly_Sales values from the training set of dimension
+  #         (number of weeeks in training data) x (number of stores)
+  # test - An all-zeros matrix of dimension:
+  #       (number of weeeks in training data) x (number of stores)
+  #       The forecasts are written in place of the zeros.
+  #
+  # returns:
+  #  the test(forecast) data frame with the forecasts filled in 
   h <- nrow(test)
   tr <- train[nrow(train) - (52:1) + 1,]
   tr[is.na(tr)] <- 0
@@ -82,7 +116,50 @@ product <- function(train, test){
   test
 }
 
+tslm.basic <- function(train, test){
+  # Computes a forecast using linear regression and seasonal dummy variables
+  #
+  # args:
+  # train - A matrix of Weekly_Sales values from the training set of dimension
+  #         (number of weeeks in training data) x (number of stores)
+  # test - An all-zeros matrix of dimension:
+  #       (number of weeeks in training data) x (number of stores)
+  #       The forecasts are written in place of the zeros.
+  #
+  # returns:
+  #  the test(forecast) data frame with the forecasts filled in 
+  horizon <- nrow(test)
+  train[is.na(train)] <- 0
+  for(j in 2:ncol(train)){
+    s <- ts(train[, j], frequency=52)
+    model <- tslm(s ~ trend + season)
+    fc <- forecast(model, h=horizon)
+    test[, j] <- as.numeric(fc$mean)
+  }
+  test
+}
+
 stlf.svd <- function(train, test, model.type, n.comp){
+  # Replaces the training data with a rank-reduced approximation of itself,
+  # then forecasts each store using stlf() from the forecast package.
+  # That function performs an STL decomposition on each series, seasonally
+  # adjusts the data, non-seasonally forecasts the seasonally adjusted data,
+  # and then adds in the naively extended seasonal component to get the
+  # final forecast.
+  #
+  # args:
+  # train - A matrix of Weekly_Sales values from the training set of dimension
+  #         (number of weeeks in training data) x (number of stores)
+  # test - An all-zeros matrix of dimension:
+  #       (number of weeeks in training data) x (number of stores)
+  #       The forecasts are written in place of the zeros.
+  # model.type - one of 'ets' or 'arima', specifies which type of model to
+  #        use for the non-seasonal forecast
+  # n.comp - the number of components to keep in the singular value
+  #         decomposition that is performed for preprocessing
+  #
+  # returns:
+  #  the test(forecast) data frame with the forecasts filled in 
   horizon <- nrow(test)
   train <- preprocess.svd(train, n.comp) 
   for(j in 2:ncol(train)){
@@ -110,10 +187,28 @@ stlf.svd <- function(train, test, model.type, n.comp){
 }
 
 stlf.nn <- function(train, test, method='ets', k, level1, level2){
-  # level1 - a correlation cutoff above this level, take everything
-  # -or-
-  # k - take up to k components...
-  # level2 - that are above level2
+  # Function standard scales the series and computes a correlation matrix.
+  # Then it forecasts each store using stlf() from the forecast package.
+  # That function performs an STL decomposition on each series, seasonally
+  # adjusts the data, non-seasonally forecasts the seasonally adjusted data,
+  # and then adds in the naively extended seasonal component to get the
+  # final forecast.
+  # Finally, it averages together some of the most correlated series before
+  # restoring the original scale.
+  #
+  # args:
+  # train - A matrix of Weekly_Sales values from the training set of dimension
+  #         (number of weeeks in training data) x (number of stores)
+  # test - An all-zeros matrix of dimension:
+  #       (number of weeeks in training data) x (number of stores)
+  #       The forecasts are written in place of the zeros.
+  # method - one of 'ets' or 'arima', specifies which type of model to
+  #        use for the non-seasonal forecast
+  # level1 - all series correlated to this level are used in the average
+  # level2 - no series are used if they are correlated to less than this level
+  # k - up to k series that are above level2 will be selected
+  # returns:
+  #  the test(forecast) data frame with the forecasts filled in 
   horizon <- nrow(test)
   tr <- train[, 2:ncol(train)]
   tr[is.na(tr)] <- 0
@@ -162,15 +257,29 @@ stlf.nn <- function(train, test, method='ets', k, level1, level2){
 }
 
 fourier.arima <- function(train, test, k){
+  # This model is a regression on k sin/cos pairs of Fourier series terms
+  # with non-seasonal arima errors. The call to auto.arima() crashes on data
+  # with too many missing values, or too many identical values, so this 
+  # function falls back to another, more stable method in that case.
+  #
+  # args:
+  # train - A matrix of Weekly_Sales values from the training set of dimension
+  #         (number of weeeks in training data) x (number of stores)
+  # test - An all-zeros matrix of dimension:
+  #       (number of weeeks in training data) x (number of stores)
+  #       The forecasts are written in place of the zeros.
+  # k - number of sin/cos pair to use
+  #
+  # returns:
+  #  the test(forecast) data frame with the forecasts filled in 
   horizon <- nrow(test)
-  for(j in 2:ncol(tr)){
-    #train still has its NA's
+  for(j in 2:ncol(train)){
     if(sum(is.na(train[, j])) > nrow(train)/3){
-      test[, j] <- fallback(tr[,j], horizon)
+      test[, j] <- fallback(train[,j], horizon)
       print(paste('Fallback on store:', names(train)[j]))
     }else{
       # fit arima model
-      s <- ts(tr[, j], frequency=365/7)
+      s <- ts(train[, j], frequency=365/7)
       model <- auto.arima(s, xreg=fourier(s, k), ic='bic', seasonal=FALSE)
       fc <- forecast(model, h=horizon, xreg=fourierf(s, k, horizon))
       test[, j] <- as.numeric(fc$mean)
@@ -180,6 +289,20 @@ fourier.arima <- function(train, test, k){
 }
 
 seasonal.arima.svd <- function(train, test, n.comp){
+  # Replaces the training data with a rank-reduced approximation of itself
+  # and then produces seasonal arima forecasts for each store.
+  #
+  # args:
+  # train - A matrix of Weekly_Sales values from the training set of dimension
+  #         (number of weeeks in training data) x (number of stores)
+  # test - An all-zeros matrix of dimension:
+  #       (number of weeeks in training data) x (number of stores)
+  #       The forecasts are written in place of the zeros.
+  # n.comp - the number of components to keep in the singular value
+  #         decomposition that is performed for preprocessing
+  #
+  # returns:
+  #  the test(forecast) data frame with the forecasts filled in 
   horizon <- nrow(test)
   tr <- preprocess.svd(train, n.comp)
   for(j in 2:ncol(tr)){
@@ -199,20 +322,18 @@ seasonal.arima.svd <- function(train, test, n.comp){
   test
 }
 
-tslm.basic <- function(train, test){
-  horizon <- nrow(test)
-  train[is.na(train)] <- 0
-  for(j in 2:ncol(train)){
-    s <- ts(train[, j], frequency=52)
-    model <- tslm(s ~ trend + season)
-    fc <- forecast(model, h=horizon)
-    test[, j] <- as.numeric(fc$mean)
-  }
-  test
-}
-
 fallback <- function(train, horizon){
-  #NB: train should be a column
+  # This method is a fallback forecasting method in the case that there are
+  # enough NA's to possibly crash arima models. It takes one seasonal 
+  # difference, forecasts with a level-only exponential model, and then
+  # inverts the seasonal difference.
+  # 
+  # args:
+  # train - a vector of training data for one store
+  # horizon - the forecast horizon in weeks
+  #
+  # returns:
+  #  a vector of forecast values
   s <- ts(train, frequency=52)
   s[is.na(s)] <- 0
   fc <- ses(diff(s, 52), h=horizon)
@@ -221,6 +342,19 @@ fallback <- function(train, horizon){
 }
 
 preprocess.svd <- function(train, n.comp){
+  # Replaces the training data with a rank-reduced approximation of itself.
+  # This is for noise reduction. The intuition is that characteristics
+  # that are common across stores (within the same department) are probably
+  # signal, while those that are unique to one store may be noise.
+  #
+  # args:
+  # train - A matrix of Weekly_Sales values from the training set of dimension
+  #         (number of weeeks in training data) x (number of stores)
+  # n.comp - the number of components to keep in the singular value
+  #         decomposition
+  #
+  # returns:
+  #  the rank-reduced approximation of the training data
   train[is.na(train)] <- 0
   z <- svd(train[, 2:ncol(train)], nu=n.comp, nv=n.comp)
   s <- diag(z$d[1:n.comp])

@@ -11,9 +11,10 @@ There is a [Kaggle forum post](http://www.kaggle.com/c/walmart-recruiting-store-
 
 ##Setup
 The code assumes a directory structure under the project level of:  
-* data/ - with the data from Kaggle
-* R/ - with the code from here
-* submissions/ - the code will write submissions here
+
+* data/ - with the data from Kaggle  
+* R/ - with the code from here  
+* submissions/ - the code will write submissions here  
 
 ##Usage:
 You can regenerate the winning entry with source('runAll.R') from inside R. Without the fourier.arima model, the code runs in 30-40 minutes and gets about 2320 on the final leader board. With that model included, it generates the winning score of around 2300, but takes an extra 2 hours or so.  

@@ -4,20 +4,13 @@ require(reshape)
 
 grouped.forecast <- function(train, test, fname, ...){
   
-  FNAMES <- c('hook',
-              'seasonal.naive',
-              'naive2',
+  FNAMES <- c('seasonal.naive',
               'product',
-              'svd.model',
-              'de',
               'stlf.svd',
               'fourier.arima',
-              'fourier.detrend',
               'stlf.nn',
               'seasonal.arima.svd',
-              'tslm.svd',
-              'stl.svd',
-              'naive.loess')
+              'tslm')
   
   if(fname %in% FNAMES){
     f <- get(fname)
@@ -56,11 +49,6 @@ grouped.forecast <- function(train, test, fname, ...){
     fc.d$Weekly_Sales <- 0
     fc.d <- cast(fc.d, Date ~ Store)
     result <- f(tr.d, fc.d, ...)
-#     result <- tryCatch(f(tr.d, fc.d, ...), 
-#                        error=function(e) {
-#                          print(paste('exception on dept:',d))
-#                          de(tr.d, fc.d)
-#                        })
     # This has all Stores/Dates for this dept, but may have some that
     # don't go into the submission.
     result <- melt(result)
@@ -73,50 +61,10 @@ grouped.forecast <- function(train, test, fname, ...){
   pred
 }
 
-hook <- function(train, test){
-  browser()
-  test
-}
-
-stl.svd <- function(train, test, n.comp, s.deg=0, s.win=3){
-  horizon <- nrow(test)
-  tr <- preprocess.svd(train, n.comp)
-  for(j in 2:ncol(tr)){
-    s <- ts(tr[, j], frequency=52)
-    dc <- stl(s, s.window=s.win, s.degree=s.deg, l.window=9)
-    fc <- forecast(dc, h=horizon, ic='bic', opt.crit='mae')
-    test[,j] <- as.numeric(fc$mean)
-  }
-  test
-}
-
 seasonal.naive <- function(train, test){
-  all <- rbind(train, test)
-  pred.idx <- (nrow(train) + 1):nrow(all)
-  all[is.na(all)] <- 0
-  for(k in pred.idx){
-    all[k, 2:ncol(all)] <- all[k-52, 2:ncol(all)]
-  }
-  all[pred.idx,]
-}
-
-naive2 <- function(train, test){
   h <- nrow(test)
   tr <- train[nrow(train) - (52:1) + 1,]
   tr[is.na(tr)] <- 0
-  test[,2:ncol(test)]  <- tr[1:h,2:ncol(test)]
-  test
-}
-
-naive.loess <- function(train, test, tgt=30){
-  h <- nrow(test)
-  train[is.na(train)] <- 0
-  for(j in 2:ncol(train)){
-    d <- data.frame('y'=train[,j], 't'=(2.75/nrow(train))*(1:nrow(train)))
-    l <- loess(y ~ t, data=d, enp.target=tgt)
-    train[, j] <- fitted(l)
-  }
-  tr <- train[nrow(train) - (52:1) + 1,]
   test[,2:ncol(test)]  <- tr[1:h,2:ncol(test)]
   test
 }
@@ -131,14 +79,6 @@ product <- function(train, test){
   pred <- matrix(profile, ncol=1) %*% matrix(levels, nrow=1)
   pred <- pred / overall
   test[,2:ncol(test)] <- pred[1:h,]
-  test
-}
-
-svd.model <- function(train, test, n.comp){
-  h <- nrow(test)
-  tr <- train[nrow(train) - (52:1) + 1, 2:ncol(train)]
-  tr2 <- preprocess.svd(tr, n.comp)
-  test[, 2:ncol(test)] <- tr2[1:h, ]
   test
 }
 
@@ -229,32 +169,6 @@ stlf.nn <- function(train, test, method='ets', k, level1, level2){
   test
 }
 
-fourier.detrend <- function(train, test, s.win, k=12){
-  horizon <- nrow(test)
-  # not doing svd for now
-  for(j in 2:ncol(train)){
-    if(sum(is.na(train[,j])) > nrow(train)/3){
-      test[, j] <- fallback.linear(train[,j], horizon, k)
-      print(paste('Fallback to linear model on store:', names(train)[j]))
-    }else{
-      s <- ts(train[, j], frequency=52)
-      s[is.na(s)] <- 0
-      dc <- stl(s, s.window=s.win)
-      s.comp <- dc$time.series[,1]
-      model1 <- auto.arima(s.comp, 
-                           xreg=fourier(s.comp, k), 
-                           ic='bic', 
-                           seasonal=FALSE)
-      fc1 <- forecast(model1, h=horizon, xreg=fourierf(s.comp, k, horizon))
-      model2 <- ets(seasadj(dc), model='ZZN', opt.crit='mae', ic='bic')
-      fc2 <- forecast(model2, h=horizon)
-      pred <- fc1$mean + fc2$mean
-      test[,j] <- as.numeric(pred)
-    }
-  }
-  test
-}
-
 fourier.arima <- function(train, test, n.comp, k){
   horizon <- nrow(test)
   tr <- preprocess.svd(train, n.comp)
@@ -303,31 +217,8 @@ fallback <- function(train, horizon){
   result[length(result) - horizon:1 + 1]
 }
 
-fallback.linear <- function(train, horizon, k){
-  s <- ts(train, frequency=52)
-  s[is.na(s)] <- 0
-  f <- fourier(s, k)
-  model <- tslm(s ~ trend + f)
-  f <- fourierf(s, k, horizon)
-  fc <- forecast(model, h=horizon)
-  as.numeric(fc$mean)
-}
-
-de <- function(train, test, n.comp){
+tslm <- function(train, test){
   horizon <- nrow(test)
-  train <- preprocess.svd(train, n.comp)
-  for(j in 2:ncol(train)){
-    s <- ts(train[, j], frequency=52)
-    fc <- ses(diff(s, 52), h=horizon)
-    result <- diffinv(fc$mean, lag=52, xi=s[length(s) - 51:0])
-    test[, j] <- result[length(result) - horizon:1 + 1]
-  }
-  test
-}
-
-tslm.svd <- function(train, test, n.comp){
-  horizon <- nrow(test)
-  train <- preprocess.svd(train, n.comp)
   for(j in 2:ncol(train)){
     s <- ts(train[, j], frequency=52)
     model <- tslm(s ~ trend + season)

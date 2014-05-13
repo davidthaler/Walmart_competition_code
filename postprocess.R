@@ -1,14 +1,7 @@
 require(plyr)
 require(reshape)
 
-PNAMES <- c('shift', 'super.bowl', 'thanksgiving')
-
-postprocess <- function(train, test, pname, ...){
-  if(pname %in% PNAMES){
-    f <- get(pname)
-  }else{
-    stop(pname,' not legal forecast option')
-  }
+postprocess <- function(train, test, ...){
   if('Id' %in% names(test)){
     #This is a saved submission
     sales <- test$Weekly_Sales
@@ -59,42 +52,6 @@ shift <- function(train, test, threshold=1.1, shift=2){
       shifted.sales[2:5, ] <- shifted.sales[2:5, ] + (shift/7) * holiday[1:4, ]
       shifted.sales[1, ] <- holiday[1, ]
       test[idx, 2:46] <- shifted.sales
-  }
-  test
-}
-
-super.bowl <- function(train, test, wts=c(1,1), threshold=1.1){
-  wts <- wts/sum(wts)
-  dates <- as.Date(c('2010-02-12', '2011-02-11', '2012-02-10', '2013-02-08'))
-  before <- which(train$Date %in% dates) - 1
-  after <- which(train$Date %in% dates) + 1
-  around <- union(before, after)
-  train[is.na(train)] <- 0
-  baseline <- colMeans(train[around, 2:46])
-  sales <- colMeans(train[train$Date %in% dates, 2:46])
-  fc <- as.numeric(test[test$Date %in% dates, 2:46])
-  ratio <- mean(sales)/mean(baseline)
-  if(is.finite(ratio) & (ratio > threshold)){
-    test[test$Date %in% dates, 2:46] <- wts[1] * fc + wts[2] * sales
-    print('adjusting')
-  }
-  test
-}
-
-thanksgiving <- function(train, test, wts=c(2,1), threshold=1.1){
-  wts <- wts/sum(wts)
-  dates <- as.Date(c('2010-11-26', '2011-11-25', '2012-11-23'))
-  before <- which(train$Date %in% dates) - 1
-  after <- which(train$Date %in% dates) + 1
-  around <- union(before, after)
-  train[is.na(train)] <- 0
-  baseline <- colMeans(train[around, 2:46])
-  sales <- colMeans(train[train$Date %in% dates, 2:46])
-  fc <- as.numeric(test[test$Date %in% dates, 2:46])
-  ratio <- mean(sales)/mean(baseline)
-  if(is.finite(ratio) & (ratio > threshold)){
-    test[test$Date %in% dates, 2:46] <- wts[1] * fc + wts[2] * sales
-    print('adjusting')
   }
   test
 }

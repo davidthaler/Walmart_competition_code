@@ -1,69 +1,66 @@
 require(plyr)
 
-extract.year<- function(dates){
-  # returns a vector of the years, given a list of Dates
-  sapply(strsplit(as.character(dates),'-'), as.numeric)[1,]
+paths = list(data='~/Documents/Kaggle/Walmart/data/',
+             submit='~/Documents/Kaggle/Walmart/submissions/',
+             r='~/Documents/Kaggle/Walmart/R/',
+             valid='~/Documents/Kaggle/Walmart/validation/')
+
+sample.submission <- function(){
+  ss <- read.csv(paste0(paths$data, 'sampleSubmission.csv'))
 }
 
-extract.month <- function(dates){
-  # returns a vector of the month numbers, given a list of Dates
-  sapply(strsplit(as.character(dates),'-'), as.numeric)[2,]
+raw.train <- function(){
+  cls <- c('factor', 'factor', 'Date', 'numeric', 'logical')
+  train <- read.csv(paste0(paths$data, 'train.csv'), 
+                    colClasses=cls)
 }
 
-extract.day <- function(dates){
-  # returns a vector day numbers in month, given a list of Dates
-  sapply(strsplit(as.character(dates),'-'), as.numeric)[3,]
+raw.test <- function(){
+  cls <- c('factor', 'factor', 'Date', 'logical')
+  test <- read.csv(paste0(paths$data, 'test.csv'), 
+                   colClasses=cls)
 }
 
-first.week <- function(dates){
-  # returns a logical vector which is TRUE if the date is from the
-  # first week of its month
-  extract.day(dates) <= 7
+reload.submission <- function(submit.num){
+  submit.path <- paste0(paths$submit, 'submission', submit.num, '.csv')
+  read.csv(submit.path)
 }
 
-extract.series <- function(train, store, dept){
-  train.dates <- data.frame(Date=unique(train$Date))
-  train.sd <- train[train$Store==store & train$Dept==dept, 
-                    c('Date','Weekly_Sales')]
-  train.dates <- join(train.dates, train.sd)
-  ts(train.dates$Weekly_Sales, start=c(2010, 5), frequency=52)
+make.average <- function(submissions, wts=NULL){
+  if(is.null(wts)){
+    wts <- rep(1, length(submissions))
+  }
+  pred <- sample.submission()
+  for(k in 1:length(submissions)){
+    sub.k <- reload.submission(submissions[k])
+    pred.k <- wts[k] * sub.k$Weekly_Sales
+    pred$Weekly_Sales <- pred$Weekly_Sales + pred.k
+  }
+  pred$Weekly_Sales <- pred$Weekly_Sales/sum(wts)
+  pred
 }
+
+write.submission <- function(pred){
+  ss <- sample.submission()
+  subs <- dir(paths$submit)
+  subs <- grep('submission[0-9]+(.csv)(.zip|.gz)?', subs, value=TRUE)
+  nums <- gsub('submission','', gsub('(.csv)(.zip|.gz)?','', subs))
+  submission.number <- max(as.numeric(nums))
+  if(is.na(submission.number)){
+    submission.number <- 0
+  }
+  submission.number <- submission.number + 1
+  ss$Weekly_Sales <- pred$Weekly_Sales
+  submit.path = paste0(paths$submit, 
+                       'submission', 
+                       submission.number,
+                       '.csv')
+  print(paste('Writing to:', submit.path))
+  write.csv(ss, file = submit.path, quote=FALSE, row.names=FALSE)
+}
+
 
 wmae <- function(pred, test){
   w <- 4*test$IsHoliday + 1
   sum(w*abs(pred$Weekly_Sales - test$Weekly_Sales))/sum(w)
 }
-
-convert.pred <- function(test.data, pred){
-  #Converts a prediction vector into a form that can be submitted
-  #using write.submission, which requires a data frame.
-  #Params:
-  # test.data - the test data frame; this must have the same
-  #             ordering as what was given to the predict routine
-  # pred - the prediction vector to convert to a data frame
-  # Returns:
-  # A data frame with the index fields (Store, Dept, Date)
-  # of the test set and the predictions joined on as Weekly_Sales.
-  out <- test.data[c('Store', 'Dept', 'Date')]
-  out$Weekly_Sales <- pred
-  out
-}
-
-unique.loc <- function(data){
-  # Params:
-  # data - either train or test df
-  # Returns:
-  # list of tuples of unique store-dept pairs
-  out <- list()
-  stores <- unique(data$Store)
-  for (s in stores){
-    df <- data[ data$Store == s, ]
-    depts <- unique(df$Dept)
-    for (d in depts){
-      tag <- paste0(s,'-',d)
-      out[[tag]] <- c(s,d)
-    }
-  }
-  out
-}
-

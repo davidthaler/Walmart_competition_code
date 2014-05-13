@@ -96,24 +96,7 @@ reload.validation <- function(submit.name){
   read.csv(paste0(paths$valid, submit.name, '.csv'))
 }
 
-reload.submission <- function(submit.num){
-  submit.path <- paste0(paths$submit, 'submission', submit.num, '.csv')
-  read.csv(submit.path)
-}
 
-make.average <- function(submissions, wts=NULL){
-  if(is.null(wts)){
-    wts <- rep(1, length(submissions))
-  }
-  pred <- sample.submission()
-  for(k in 1:length(submissions)){
-    sub.k <- reload.submission(submissions[k])
-    pred.k <- wts[k] * sub.k$Weekly_Sales
-    pred$Weekly_Sales <- pred$Weekly_Sales + pred.k
-  }
-  pred$Weekly_Sales <- pred$Weekly_Sales/sum(wts)
-  pred
-}
 
 
 

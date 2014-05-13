@@ -20,13 +20,13 @@ You can regenerate the winning entry with source('runAll.R') from inside R. With
 
 To run the best performing single model from scratch:  
 
-   source('util.R')
-   source('grouped.forecast')
-   source('util')
-   train <- raw.train()
-   test <- raw.test()
-   pred <- grouped.forecast(train, test, 'stlf.svd', model.type='ets', n.comp=12)
-   pred <- postprocess(train, test, shift=2.5)
+   source('util.R')  
+   source('grouped.forecast')  
+   source('util')  
+   train <- raw.train()  
+   test <- raw.test()  
+   pred <- grouped.forecast(train, test, 'stlf.svd', model.type='ets', n.comp=12)  
+   pred <- postprocess(train, test, shift=2.5)  
    write.submission(pred)  
 
 If you are in the competition (or have accepted the rules), you should be able to submit that for 2348 on the final leaderboard by going to: [submit](http://www.kaggle.com/c/walmart-recruiting-store-sales-forecasting/submissions/attach) and uploading the .csv file.

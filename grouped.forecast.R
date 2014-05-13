@@ -10,7 +10,7 @@ grouped.forecast <- function(train, test, fname, ...){
               'fourier.arima',
               'stlf.nn',
               'seasonal.arima.svd',
-              'tslm')
+              'tslm.basic')
   
   if(fname %in% FNAMES){
     f <- get(fname)
@@ -161,13 +161,13 @@ stlf.nn <- function(train, test, method='ets', k, level1, level2){
   test
 }
 
-fourier.arima <- function(train, test, n.comp, k){
+fourier.arima <- function(train, test, k){
   horizon <- nrow(test)
   for(j in 2:ncol(tr)){
     #train still has its NA's
     if(sum(is.na(train[, j])) > nrow(train)/3){
       test[, j] <- fallback(tr[,j], horizon)
-      print(paste('Fallback to linear model on store:', names(train)[j]))
+      print(paste('Fallback on store:', names(train)[j]))
     }else{
       # fit arima model
       s <- ts(tr[, j], frequency=365/7)
@@ -187,7 +187,7 @@ seasonal.arima.svd <- function(train, test, n.comp){
       # Use DE model as fallback
       test[, j] <- fallback(tr[,j], horizon)
       store.num <- names(train)[j]
-      print(paste('Fallback to DE model on store:', store.num))
+      print(paste('Fallback on store:', store.num))
     }else{
       # fit arima model
       s <- ts(tr[, j], frequency=52)
@@ -199,8 +199,9 @@ seasonal.arima.svd <- function(train, test, n.comp){
   test
 }
 
-tslm <- function(train, test){
+tslm.basic <- function(train, test){
   horizon <- nrow(test)
+  train[is.na(train)] <- 0
   for(j in 2:ncol(train)){
     s <- ts(train[, j], frequency=52)
     model <- tslm(s ~ trend + season)
